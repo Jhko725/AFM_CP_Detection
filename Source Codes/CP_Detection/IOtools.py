@@ -3,7 +3,27 @@ from numpy import savez, load
 import pandas as pd
 from zipfile import ZipFile
 from keras.models import load_model
-from .Model import weighted_seq_mse
+from keras.callbacks import ModelCheckpoint
+from .Model import weighted_seq_mse, amp_mse, phas_mse
+
+def RunandSave(model, hyperparameters, train, test, filepath, max_epochs = 100000, save_best = True, save_final = True):
+    
+    # Create temporary folder to save the files in
+    base_dir = os.path.dirname(filepath)
+    filename = os.path.basename(filepath).split('.')[0]
+    temp_dir = os.path.join(base_dir, filename)
+
+    # Create keras checkpoint for saving the best weight
+    autoencoder = model['autoencoder']
+    best_weight_path = os.path.join(temp_dir, "weights.best.hdf5")
+    checkpoint = ModelCheckpoint(best_weight_path, monitor='val_acc', verbose=1, save_best_only=True, mode='min')
+    callbacks_list = [checkpoint]
+
+    autoencoder.fit(x = [train[:,:,1:3], train[:,:,3:]], y = train[:,:,1:3], epochs = max_epochs, batch_size = hyperparameters['batch_size'], validation_data = ([test[:,:,1:3], test[:,:,3:]], test[:,:,1:3]), callbacks = callbacks_list)
+
+    # Need to add more code... Only needs to save the autoencoder structure
+    # Change load model so that the encoder and the decoder parts are created from the autoencoder weights
+
 
 def SaveModel(filepath, model, hyperparameters):
     
@@ -64,7 +84,7 @@ def LoadModel(filepath):
     # Define subfunction that saves the model architecture and weights
     def LoadModelandWeights(savepath, model_name):
         model_path = os.path.join(savepath, model_name+'.h5')
-        model = load_model(model_path, custom_objects={'weighted_seq_mse': weighted_seq_mse})
+        model = load_model(model_path, custom_objects={'weighted_seq_mse': weighted_seq_mse, 'amp_mse': amp_mse, 'phas_mse': phas_mse})
 
         return model
 
