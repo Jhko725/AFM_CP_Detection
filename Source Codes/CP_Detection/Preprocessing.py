@@ -16,8 +16,8 @@ def _ResCurve(w, w0, Q, I_0, C0_C):
 
 # Calibrate electrical phase by converting into radian, then adding the phase offset
 @vectorize("float64(float64, float64, float64, float64, float64, float64)", nopython = True)
-def _CalibratePhase(Pe, Pe_max, w, w0, Q, C0_C):
-    Pe = (Pe - Pe_max)*np.pi/10
+def _CalibratePhase(Pe, Pe_far, w, w0, Q, C0_C):
+    Pe = (Pe - Pe_far)*np.pi/10
     W = w/w0
     Pe_0 = np.arctan2(1-W**2+C0_C*(1-W**2)**2+C0_C*(W/Q)**2, W/Q)
     
@@ -50,7 +50,114 @@ def _Edis(Am, Pm, w, w0, Q): # Takes numpy array Ae and Pe, then returns E_dis n
     return Edis
 
 '''
+** ImportResCurve **
+
+    Inputs: filepath 
+        - filepath: filepath of the resonance curve file
+    
+    Outputs: res_data, fit_param, w
+        - res_data: resonance curve data in pandas dataframe format
+        - fit_param: resonance curve fitting parameters, [w0, Q, I0, C0/C]
+        - w: driving frequency (assumes that the driving frequency is the frequency at which the resonance curve takes its maximum)     
+'''
+
+def ImportResCurve(filepath, visualize = False, fit_param_init = [5000, 3, 1/800]):
+    
+    # Import resonance curve data using pandas
+    # The parameter skiprows ensures that the comments on the top 
+    res_data = pd.read_csv(filepath, header = None, delimiter = '\t', skiprows = 9)
+    
+    # Res curve is in the format [freq, amp, freq, phas, aux], so drop the redundant 3rd column
+    res_data = res_data.drop(res_data.columns[4], axis = 1)
+    res_data = res_data.drop(res_data.columns[2], axis = 1)
+    
+    # Set appropriate column name
+    res_data.rename(columns = {0:'Frequency(Hz)', 1:'Amplitude(V)', 3:'Phase(V)'}, inplace = True)
+    
+    # Numpy array of the resonance curve data in [freq, amp, phas] format
+    res_array = res_data.values
+    
+    # Frequency of  the maximum amplitude measured. This is equal the driving frequency used
+    w0_init = res_array[res_array[:,1].argmax(),0] 
+    w = w0_init
+    
+    # Fit the resonance curve
+    Q_init, I0_init, C0_C_init = fit_param_init
+    fit_param, _ = curve_fit(_ResCurve, res_array[:,0], res_array[:,1], p0 = [w0_init, Q_init, I0_init, C0_C_init], bounds = (0, np.inf))
+    
+    fig = None
+
+    if visualize:
+        # For the visualize keyword, create a figure of the experimental and fitted resonance curve
+        fontsize = 13
+        labelpad = 10
+        tkw = dict(size = 6, width = 1.5, labelsize = fontsize)
+        
+        fig, ax_left = plt.subplots(1, 1, figsize = (7,5))
+        ax_left.plot(res_array[:,0], res_array[:,1], '.-k', label = 'Amplitude(V)')
+        ax_left.plot(res_array[:,0], _ResCurve(res_array[:,0], *fit_param), '-r', alpha = 0.8, label = 'Fitted Curve')
+        ax_left.set_xlabel('Frequency (Hz)', fontsize = fontsize, labelpad = labelpad)
+        ax_left.set_ylabel('Amplitude (V)', fontsize = fontsize, labelpad = labelpad)
+        
+        ax_right = ax_left.twinx()
+        ax_right.plot(res_array[:,0], res_array[:,2], '.-b', alpha = 0.2, label = 'Phase(V)')
+        ax_right.set_ylabel('Phase(V)', fontsize = fontsize, labelpad = labelpad)
+        ax_left.grid(ls = '--')
+        
+        h_right, l_right = ax_right.get_legend_handles_labels()
+        h_left, l_left = ax_left.get_legend_handles_labels()
+        
+        ax_left.tick_params(axis='x', **tkw)
+        ax_left.tick_params(axis='y', **tkw)
+        ax_right.tick_params(axis='y', colors='blue', **tkw)
+        ax_right.yaxis.label.set_color('blue')
+            
+        ax_right.legend(h_right+h_left, l_right+l_left, loc = 'upper right', fontsize = fontsize - 1)
+        
+    return res_data, fit_param, w, fig
+
+
+def ImportAppCurve(filepath, visualize = False):
+    data = pd.read_csv(filepath, header = None, delimiter = '\t', engine = 'python', skipfooter = 20) # Skip all the comments at the bottom
+    data = data.drop(data.columns[3], axis=1) # Drop the Aux1 measurements
+    data.rename(columns = {0:'z(nm or bits)', 1:'Amplitude(V)', 2:'Phase(V)'}, inplace = True)
+
+    imin = data.idxmin(axis = 0)[0]
+    
+    if visualize:
+        # For the visualize keyword, create a figure of the experimental and fitted resonance curve
+        fontsize = 13
+        labelpad = 10
+        tkw = dict(size = 6, width = 1.5, labelsize = fontsize)
+        
+        fig, ax_left = plt.subplots(1, 1, figsize = (7,5))
+        ax_left.plot(data.iloc[0:imin+1,0], data.iloc[0:imin+1,1], '.-k', alpha = 0.8, label = 'Amplitude_Approach(V)')
+        ax_left.plot(data.iloc[imin+1:,0], data.iloc[imin+1:,1], '.-b', alpha = 0.8, label = 'Amplitude_Retract(V)')
+        ax_left.set_xlabel('Frequency (Hz)', fontsize = fontsize, labelpad = labelpad)
+        ax_left.set_ylabel('Amplitude (V)', fontsize = fontsize, labelpad = labelpad)
+        
+        ax_right = ax_left.twinx()
+        ax_right.plot(data.iloc[0:imin+1,0], data.iloc[0:imin+1,2], '.-r', alpha = 0.8, label = 'Phase_Approach(V)')
+        ax_right.plot(data.iloc[imin+1:,0], data.iloc[imin+1:,2], '.-m', alpha = 0.8, label = 'Phase_Retract(V)')
+        ax_right.set_ylabel('Phase(V)', fontsize = fontsize, labelpad = labelpad)
+        ax_left.grid(ls = '--')
+        
+        h_right, l_right = ax_right.get_legend_handles_labels()
+        h_left, l_left = ax_left.get_legend_handles_labels()
+        
+        ax_left.tick_params(axis='x', **tkw)
+        ax_left.tick_params(axis='y', **tkw)
+        ax_right.tick_params(axis='y', colors='red', **tkw)
+        ax_right.yaxis.label.set_color('red')
+            
+        ax_right.legend(h_right+h_left, l_right+l_left, loc = 'upper right', fontsize = fontsize - 1)
+        
+    return data, imin
+
+
+'''
 ** DataReformatter(filepath, savepath) **
+
 Inputs:
 - folderpath: path to the folder containing the AFM raw data. Each data run in the folder must be organized into subfolders, 
 with one resonance curve and multiple approach curves per subfolder
@@ -94,7 +201,7 @@ def DataReformatter(folderpath, savepath):
     subfolder = os.listdir(folderpath)
     
     for sf in subfolder:
-        files = os.listdir(os.path.join(folderpath, +sf))
+        files = os.listdir(os.path.join(folderpath, sf)) 
     
         # Isolate the resonance curve file from the approach curve files
         i = 0
@@ -116,7 +223,7 @@ def DataReformatter(folderpath, savepath):
         res_data = pd.read_csv(res_file_path, header = None, delimiter = '\t', skiprows = 9)
         res_data = res_data.values
     
-        w0_init = res_data[res_data[:,1].argmax(),0] # Frequency of  the maximum amplitude measured. This is the driving frequency used
+        w0_init = res_data[res_data[:,1].argmax(),0] # Frequency of the maximum amplitude measured. This is the driving frequency used
         w = w0_init
 
         popt, _= curve_fit(_ResCurve, res_data[:,0], res_data[:,1], p0 = [w0_init, 5000, 3, 1/800], bounds = (0, np.inf))
@@ -141,7 +248,7 @@ def DataReformatter(folderpath, savepath):
             data = raw_data.values # z = data[:,0], Ae = data[:,1], Pe = data[:,2]
 
             # Convert phase to radian and offset it
-            data[:,2] = _CalibratePhase(data[:,2], np.amax(data[:,2]), w, w0, Q, C0_C)
+            data[:,2] = _CalibratePhase(data[:,2], data[0,2], w, w0, Q, C0_C)
         
             # Create raw data dataset
             raw_dataset.append(data)
@@ -162,6 +269,9 @@ def DataReformatter(folderpath, savepath):
             
             # Normalize mechanical amplitude
             mech_data[:,1] = mech_data[:,1]/mech_data[0,1]
+
+            # Offset mechanical phase
+            mech_data[:,2] = mech_data[:,2] - mech_data[0,2]
         
             # Calculate normalized energy dissipation E
             E = _Edis(mech_data[:,1], mech_data[:,2], w, w0, Q)

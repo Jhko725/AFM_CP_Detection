@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 # the data must be in the format PreProcessing.DataPrep returns
-def PlotApproachCurve(data, figsize = (11, 3), fontsize = 11, wspace = 0.3, kwargs = {}):
+def PlotApproachCurve(data, figsize = (11, 3), fontsize = 11, wspace = 0.3, **kwargs):
     fig = plt.figure(figsize = figsize)
     ax1 = fig.add_subplot(121)
     ax2 = fig.add_subplot(122)
@@ -21,7 +22,7 @@ def PlotApproachCurve(data, figsize = (11, 3), fontsize = 11, wspace = 0.3, kwar
     
     return fig
 
-def PlotHistory(history, figsize = (14, 3), wspace = 0.3, fontsize = 11, kwargs = {}):
+def PlotHistory(history, figsize = (14, 3), wspace = 0.3, fontsize = 11, **kwargs):
     fig, axes = plt.subplots(1, 3, figsize = figsize)
     fig.subplots_adjust(wspace = wspace)
 
@@ -50,12 +51,13 @@ def PlotHistory(history, figsize = (14, 3), wspace = 0.3, fontsize = 11, kwargs 
         
     return fig
 
-def PlotReconstruction(plot_index, model, data, figsize = (24, 5), wspace = 0.3, size = 4, width = 1.5, fontsize = 14, kwargs = {'s': 3}):
+def PlotReconstruction(plot_index, model, data, figsize = (24, 5), wspace = 0.3, size = 4, width = 1.5, fontsize = 14, **kwargs):
     autoencoder = model['autoencoder']
     encoder = model['encoder']
 
-    reconst = autoencoder.predict([data[plot_index,:,1:3], data[plot_index,:,3:]])
-    latent = encoder.predict([data[plot_index,:,1:3], data[plot_index,:,3:]])
+    seq = np.expand_dims(data[plot_index, :, :], axis = 0)
+    reconst = autoencoder.predict([seq[:,:,1:3], seq[:,:,3:]])
+    latent = encoder.predict([seq[:,:,1:3], seq[:,:,3:]])
 
     fig = plt.figure(figsize = figsize)
     ax_l1 = fig.add_subplot(131)
@@ -68,14 +70,14 @@ def PlotReconstruction(plot_index, model, data, figsize = (24, 5), wspace = 0.3,
     ax_r2 = ax_r1.twinx()
 
     # Plot the data
-    line_l1 = ax_l1.scatter(data[plot_index,:,0], data[plot_index,:,1], color = 'black', label = 'Experiment', **kwargs)
-    line_l2 = ax_l2.scatter(data[plot_index,:,0], reconst[0,:,0], color = 'tab:red', label = 'Reconstructed', **kwargs)
+    line_l1 = ax_l1.scatter(seq[0,:,0], seq[0,:,1], color = 'black', label = 'Experiment', **kwargs)
+    line_l2 = ax_l2.scatter(seq[0,:,0], reconst[0,:,0], color = 'tab:red', label = 'Reconstructed', **kwargs)
 
-    line_m1 = ax_m1.scatter(data[plot_index,:,0], data[plot_index,:,2], color = 'black', label = 'Experiment', **kwargs)
-    line_m2 = ax_m2.scatter(data[plot_index,:,0], reconst[0,:,1], color = 'tab:red', label = 'Reconstructed', **kwargs)
+    line_m1 = ax_m1.scatter(seq[0,:,0], seq[0,:,2], color = 'black', label = 'Experiment', **kwargs)
+    line_m2 = ax_m2.scatter(seq[0,:,0], reconst[0,:,1], color = 'tab:red', label = 'Reconstructed', **kwargs)
 
-    line_r1 = ax_r1.scatter(data[plot_index,:,0], data[plot_index,:,1], color = 'black', label = 'Amplitude', **kwargs)
-    line_r2 = ax_r2.scatter(data[plot_index,:,0], latent[0,:,0], color = 'tab:red', label = 'Latent Variable', **kwargs)
+    line_r1 = ax_r1.scatter(seq[0,:,0], seq[0,:,1], color = 'black', label = 'Amplitude', **kwargs)
+    line_r2 = ax_r2.scatter(seq[0,:,0], latent[0,:,0], color = 'tab:red', label = 'Latent Variable', **kwargs)
 
     ax_l1.set_xlabel('Distance z (nm)', fontsize = fontsize)
     ax_l1.set_ylabel('Experimental Amplitude', fontsize = fontsize)
@@ -125,7 +127,7 @@ def PlotReconstruction(plot_index, model, data, figsize = (24, 5), wspace = 0.3,
     ax_r1.grid(ls = '--')
 
     return fig
-    
+
 def PlotLatent(encoder, data, figsize = (7, 5), kwargs = {'c':'k', 'marker':'.', 'alpha':0.1}):
     latent = encoder.predict([data[:,:,1:3], data[:,:,3:]])
     
