@@ -364,13 +364,15 @@ def DataPrep(filepath, test_ratio = 0.1, seed = None): # the filepath must point
     
     seq_length = np.amin(imin_dataset) + 1
     
-    #create data array : (trials, seq_length, 5)
+    # create data array : (trials, seq_length, 5)
     data = np.zeros((N, seq_length, 5))
     for i in range(N):
         data[i,:,0:3] = mech_dataset[i][imin_dataset[i]+1-seq_length:imin_dataset[i]+1, 0:3]
         data[i,:,3] = np.ones((1, seq_length))*Q_dataset[i]/w0_dataset[i] # 3rd channel is Q/w0
         data[i,:,4] = np.ones((1, seq_length))*w_dataset[i]/w0_dataset[i] # 4th channel is w/w0
     
+    # change the phase to cos(phase) (this is to prevent the true value from becoming 0, which results in /0 blowup when calculating the relative loss)
+    data[:,:,2] = np.cos(data[:,:,2])
     # create test and train datasets
     test_index = sample_index[0:N_test]
     train_index = sample_index[N_test:]
