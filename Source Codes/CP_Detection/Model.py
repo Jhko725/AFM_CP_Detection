@@ -109,11 +109,13 @@ def String2Block(format_string, conv1d_params, pwconv_params, layer_name = None)
 
 # Custom loss function for the model
 def amp_mse(y_true, y_pred):
-    return K.mean(K.square(1 - y_pred/y_true), axis = [0,1])[0]
+    return K.mean(K.square(y_true - y_pred), axis = [0,1])[0]
+    #return K.mean(K.square(1 - y_pred/y_true), axis = [0,1])[0]
     #return K.mean(K.square(y_true - y_pred), axis = [0,1])[0]/K.mean(K.square(y_true), axis = [0,1])[0]
 
 def phas_mse(y_true, y_pred):
-    return K.mean(K.square(1 - y_pred/y_true), axis = [0,1])[1]
+    return K.mean(K.square(y_true - y_pred), axis = [0,1])[1]
+    #return K.mean(K.square(1 - y_pred/y_true), axis = [0,1])[1]
     #return K.mean(K.square(y_true - y_pred), axis = [0,1])[1]/K.mean(K.square(y_true), axis = [0,1])[1]
 
 def weighted_seq_mse(y_true, y_pred):
